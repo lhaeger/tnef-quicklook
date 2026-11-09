@@ -1,0 +1,53 @@
+name: TNEFQuickLook
+options:
+  bundleIdPrefix: local.tnefquicklook
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_HARDENED_RUNTIME: NO
+    GENERATE_INFOPLIST_FILE: NO
+targets:
+  TNEFPreview:
+    type: application
+    platform: macOS
+    sources: [TNEFPreview]
+    dependencies:
+      - target: TNEFPreviewExtension
+    info:
+      path: TNEFPreview/Info.plist
+      properties:
+        CFBundleDisplayName: TNEF Preview
+        LSApplicationCategoryType: public.app-category.utilities
+        NSHumanReadableCopyright: ""
+    entitlements:
+      path: TNEFPreview/TNEFPreview.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+  TNEFPreviewExtension:
+    type: app-extension
+    platform: macOS
+    sources: [TNEFPreviewExtension]
+    info:
+      path: TNEFPreviewExtension/Info.plist
+      properties:
+        CFBundleDisplayName: TNEF Preview
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.quicklook.preview
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PreviewProvider
+          NSExtensionAttributes:
+            QLIsDataBasedPreview: true
+            QLSupportsSearchableItems: false
+            QLSupportedContentTypes: [com.microsoft.tnef]
+    entitlements:
+      path: TNEFPreviewExtension/TNEFPreviewExtension.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-only: true
