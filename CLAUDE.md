@@ -34,7 +34,7 @@ python3 -I scripts/make_fixtures.py TNEFKit/Tests/TNEFKitTests/Fixtures   # dete
 
 ## Gotchas
 
-- `qlmanage -p` crashes ("key cannot be nil") with app-extension previews. Verify in Finder or Mail instead, or render with `tnef-render` and look at the HTML.
+- `qlmanage -p <file>` usually shows the extension's preview; its `Cache.db` errors are noise. It has also crashed with "key cannot be nil" on app-extension previews. If it does, verify in Finder or Mail, or render with `tnef-render` and look at the HTML.
 - After reinstalling, Quick Look may keep the old extension process running. `scripts/install.sh` restarts it; by hand, run `pkill -f TNEFPreviewExtension; killall QuickLookUIService; qlmanage -r`.
 - Finder and Mail cache an extension's XPC service name per process. After the bundle identifier changes they keep connecting to the old name ("extension connection was invalidated" in the log) until the user relaunches them. Avoid changing identifiers.
 - Build output must stay in a `.noindex` folder (`build/DerivedData.noindex`). Otherwise Spotlight finds the built app, LaunchServices registers its extension as a second copy with the same identifier, and Quick Look may pick either one.

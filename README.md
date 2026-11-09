@@ -113,7 +113,7 @@ python3 -I scripts/make_fixtures.py --demo build/demo/space-to-peek.png docs/win
 
 Please don't commit real winmail.dat files; they contain other people's mail.
 
-The command-line Quick Look tester (`qlmanage -p`) crashes when it tries to load app-extension previews. To test, use Finder or Mail.
+For a quick check, `qlmanage -p winmail.dat` opens the preview from the command line. Its warnings about `Cache.db` are harmless. On some systems `qlmanage` crashes with "key cannot be nil" when it loads app-extension previews; if that happens, test in Finder or Mail instead.
 
 ## License
 
