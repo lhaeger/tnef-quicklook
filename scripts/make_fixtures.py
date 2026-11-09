@@ -333,7 +333,10 @@ def ole10native(label: str, data: bytes) -> bytes:
     return struct.pack("<I", len(body)) + body
 
 
-def ole_attachment(title: str, container: bytes) -> bytes:
+PR_RENDERING_POSITION = 0x370B
+
+
+def ole_attachment(title: str, container: bytes, position: int = 0xFFFFFFFF) -> bytes:
     return (
         attribute(LVL_ATTACHMENT, ATT_ATTACH_RENDDATA, struct.pack("<HIHHI", 2, 0xFFFFFFFF, 0, 0, 0))
         + attribute(LVL_ATTACHMENT, ATT_ATTACH_TITLE, title.encode("cp1252") + b"\0")
@@ -342,6 +345,7 @@ def ole_attachment(title: str, container: bytes) -> bytes:
             ATT_ATTACHMENT,
             mapi_props(
                 prop_long(PR_ATTACH_METHOD, ATTACH_OLE),
+                prop_long(PR_RENDERING_POSITION, position),
                 prop_variable(PT_OBJECT, PR_ATTACH_DATA_OBJ, IID_ISTORAGE + container),
             ),
         )
@@ -351,9 +355,17 @@ def ole_attachment(title: str, container: bytes) -> bytes:
 def ole() -> bytes:
     picture = compound_file([("\x01Ole", b"\x01\x00\x00\x02" + b"\0" * 16), ("CONTENTS", tiny_bmp())])
     package = compound_file([("\x01Ole10Native", ole10native("notes.txt", b"embedded notes\n"))])
+    # Outlook marks where an OLE attachment is shown with \objattph followed by one space of text.
+    rtf = (
+        b"{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0 Calibri;}}\r\n"
+        b"\\pard Before the picture:\\par\r\n"
+        b"{\\lang1024\\noproof\\objattph  }\\par\r\n"
+        b"After the picture.\\par}\r\n"
+    )
     return tnef(
         attribute(LVL_MESSAGE, ATT_SUBJECT, b"OLE objects\0"),
-        ole_attachment("Untitled Attachment", picture),
+        attribute(LVL_MESSAGE, ATT_MSG_PROPS, mapi_props(prop_variable(PT_BINARY, PR_RTF_COMPRESSED, compress_rtf(rtf)))),
+        ole_attachment("Untitled Attachment", picture, position=24),
         ole_attachment("Package", package),
     )
 

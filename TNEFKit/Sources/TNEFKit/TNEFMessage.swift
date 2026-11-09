@@ -25,13 +25,19 @@ public struct TNEFAttachment: Sendable, Equatable {
     public var data: Data
     /// True when the attachment is an embedded Outlook message rather than a file.
     public var isEmbeddedMessage: Bool
+    /// Where the attachment is shown in the message body (PidTagRenderingPosition),
+    /// nil when it is not part of the body. Attachments with a position match the
+    /// RTF body's \objattph placeholders in ascending order of this value.
+    public var renderingPosition: Int?
 
-    public init(fileName: String, mimeType: String? = nil, contentID: String? = nil, data: Data, isEmbeddedMessage: Bool = false) {
+    public init(fileName: String, mimeType: String? = nil, contentID: String? = nil, data: Data,
+                isEmbeddedMessage: Bool = false, renderingPosition: Int? = nil) {
         self.fileName = fileName
         self.mimeType = mimeType
         self.contentID = contentID
         self.data = data
         self.isEmbeddedMessage = isEmbeddedMessage
+        self.renderingPosition = renderingPosition
     }
 }
 

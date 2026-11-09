@@ -53,6 +53,7 @@ enum MAPIPropertyID {
     static let attachFilename: UInt16 = 0x3704
     static let attachMethod: UInt16 = 0x3705
     static let attachLongFilename: UInt16 = 0x3707
+    static let renderingPosition: UInt16 = 0x370B
     static let attachMimeTag: UInt16 = 0x370E
     static let attachContentID: UInt16 = 0x3712
     static let internetCodepage: UInt16 = 0x3FDE

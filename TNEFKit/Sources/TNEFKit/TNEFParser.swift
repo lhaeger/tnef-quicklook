@@ -73,7 +73,9 @@ public enum TNEFParser {
         case (Level.message, Attribute.messageProperties):
             state.messageProperties = state.parseProperties(data, context: "message properties")
         case (Level.attachment, Attribute.attachRenderData):
-            state.attachments.append(PendingAttachment())
+            // RENDDATA: type (2 bytes), position (4 bytes), width, height, flags
+            var renderData = ByteReader(data, offset: 2)
+            state.attachments.append(PendingAttachment(renderPosition: try? renderData.u32()))
         case (Level.attachment, Attribute.attachTitle):
             state.updateCurrentAttachment { $0.title = data }
         case (Level.attachment, Attribute.attachData):
@@ -91,6 +93,7 @@ private struct PendingAttachment {
     var title: [UInt8]?
     var data: [UInt8]?
     var properties = MAPIPropertyList()
+    var renderPosition: UInt32?
 }
 
 private struct ParseState {
@@ -238,12 +241,18 @@ private struct ParseState {
             (name, mimeType, data) = unwrapOLEObject(name: name, data: data)
         }
 
+        // 0xFFFFFFFF (-1 as a signed MAPI long) means "not rendered in the body".
+        let position = properties.integer(MAPIPropertyID.renderingPosition).map { Int(UInt32(truncatingIfNeeded: $0)) }
+            ?? pending.renderPosition.map(Int.init)
+        let renderingPosition = position == 0xFFFF_FFFF ? nil : position
+
         return TNEFAttachment(
             fileName: name,
             mimeType: mimeType,
             contentID: properties.string(MAPIPropertyID.attachContentID, codepage: codepage)?.nilIfEmpty,
             data: Data(data),
-            isEmbeddedMessage: isEmbedded
+            isEmbeddedMessage: isEmbedded,
+            renderingPosition: renderingPosition
         )
     }
 

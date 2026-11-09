@@ -56,7 +56,24 @@ enum HTML {
     }
 
     /// Converts an RTF body to an HTML fragment using AppKit's RTF reader.
-    static func fromRTF(_ rtf: Data) -> String? {
+    /// Each Outlook object placeholder (\objattph) is replaced by the text
+    /// `placeholderToken(n)` first, so the caller can put the n-th inline
+    /// attachment there. Returns the fragment and the number of placeholders.
+    static func fromRTF(_ rtf: Data, placeholderToken: (Int) -> String) -> (html: String, placeholders: Int)? {
+        // Latin-1 maps every byte to one character and back, so the RTF bytes survive unchanged.
+        guard var source = String(data: rtf, encoding: .isoLatin1),
+              let regex = try? NSRegularExpression(pattern: #"\\objattph(?![a-zA-Z])(-?\d+)? ?"#)
+        else { return nil }
+        let found = regex.matches(in: source, range: NSRange(source.startIndex..., in: source))
+        for (number, match) in found.enumerated().reversed() {
+            guard let range = Range(match.range, in: source) else { continue }
+            source.replaceSubrange(range, with: "\\objattph \(placeholderToken(number))")
+        }
+        guard let prepared = source.data(using: .isoLatin1), let html = fromRTF(prepared) else { return nil }
+        return (html, found.count)
+    }
+
+    private static func fromRTF(_ rtf: Data) -> String? {
         guard let text = try? NSAttributedString(data: rtf, options: [.documentType: NSAttributedString.DocumentType.rtf],
                                                  documentAttributes: nil),
               text.length > 0,
