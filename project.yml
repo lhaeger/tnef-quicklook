@@ -59,7 +59,12 @@ targets:
           NSExtensionAttributes:
             QLIsDataBasedPreview: true
             QLSupportsSearchableItems: false
-            QLSupportedContentTypes: [com.microsoft.tnef]
+            # com.microsoft.tnef is the system type. Letter Opener declares its own type
+            # for .dat / application/ms-tnef; while it is installed (or still registered
+            # from the Trash) macOS may assign that one instead.
+            QLSupportedContentTypes:
+              - com.microsoft.tnef
+              - com.creativeinaustria.letteropener.winmail
     entitlements:
       path: TNEFPreviewExtension/TNEFPreviewExtension.entitlements
       properties:

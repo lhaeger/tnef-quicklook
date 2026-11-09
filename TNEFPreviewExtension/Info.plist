@@ -29,6 +29,7 @@
 			<key>QLSupportedContentTypes</key>
 			<array>
 				<string>com.microsoft.tnef</string>
+				<string>com.creativeinaustria.letteropener.winmail</string>
 			</array>
 			<key>QLSupportsSearchableItems</key>
 			<false/>

@@ -58,7 +58,7 @@ TNEFPreview.app                    host app; exists so macOS registers the exten
   - Images are passed to Quick Look as `cid:` resources.
   - RTF bodies are converted with AppKit. Outlook's `\objattph` placeholders are replaced with the matching picture, matched by `PidTagRenderingPosition`.
   - HTML bodies are cleaned as described above.
-- **The extension** registers for the system type `com.microsoft.tnef`. It reads four bytes before anything else and leaves files over 150 MB to the default view.
+- **The extension** registers for the system type `com.microsoft.tnef`. It also registers for `com.creativeinaustria.letteropener.winmail`, the type [Letter Opener](https://winmail.help) declares for the same files. While Letter Opener is installed (even from the Trash), macOS may label `.dat` files with that type instead. The extension reads four bytes before anything else and leaves files over 150 MB to the default view.
 
 [MS-OXTNEF]: https://learn.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-oxtnef/
 [MS-OXRTFCP]: https://learn.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-oxrtfcp/

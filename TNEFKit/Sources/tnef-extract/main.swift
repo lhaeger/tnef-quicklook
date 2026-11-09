@@ -16,8 +16,20 @@ do {
     let message = try TNEFParser.parse(try Data(contentsOf: input))
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
 
+    // Outlook often names several pasted pictures identically; number the repeats like tnef does.
+    var usedNames: Set<String> = []
     for attachment in message.attachments {
-        try attachment.data.write(to: output.appendingPathComponent(attachment.fileName), options: .withoutOverwriting)
+        var name = attachment.fileName
+        let base = (name as NSString).deletingPathExtension
+        let fileExtension = (name as NSString).pathExtension
+        var counter = 1
+        while usedNames.contains(name.lowercased())
+            || FileManager.default.fileExists(atPath: output.appendingPathComponent(name).path) {
+            name = fileExtension.isEmpty ? "\(base).\(counter)" : "\(base).\(counter).\(fileExtension)"
+            counter += 1
+        }
+        usedNames.insert(name.lowercased())
+        try attachment.data.write(to: output.appendingPathComponent(name), options: .withoutOverwriting)
     }
     if let html = message.htmlBody {
         try Data(html.utf8).write(to: output.appendingPathComponent("message.html"), options: .withoutOverwriting)

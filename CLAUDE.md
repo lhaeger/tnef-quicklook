@@ -27,6 +27,7 @@ python3 -I scripts/make_fixtures.py TNEFKit/Tests/TNEFKitTests/Fixtures   # dete
 
 - **The parser must never trap on input.** All reads go through `ByteReader`, which throws. Lengths are checked against the remaining bytes before allocating (`ByteReader.length()`). Chain walks in `CompoundFile` are bounded. Damage after the TNEF header becomes a warning, not a thrown error.
 - **Every `.dat` file reaches the extension**, because macOS maps the extension to `com.microsoft.tnef`. Keep the 4-byte signature check before any full read.
+- **Other apps can claim `.dat`.** Letter Opener declares `com.creativeinaustria.letteropener.winmail`, and macOS then labels some files with that type; the extension only sees types listed in `QLSupportedContentTypes` (`project.yml`). If a valid TNEF file shows the generic view, check its type with `mdls -name kMDItemContentType <file>` before debugging the parser.
 - **Previews must not touch the network.** Anything that loads remote content has to go through `HTML.sanitizeMailBody`.
 - **Test fixtures stay synthetic.** Extend `make_fixtures.py` instead of committing real mail. Check new parser behaviour against the `tnef` CLI (`brew install tnef`) using `tnef-extract`.
 - **Inline pictures:** the n-th `\objattph` in the RTF body belongs to the n-th attachment sorted by `renderingPosition`; attachments without a position are not inline.
