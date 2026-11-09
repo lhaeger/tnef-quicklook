@@ -34,7 +34,11 @@ cd tnef-quicklook
 
 The script generates the Xcode project, builds a universal app and copies `TNEFPreview.app` to `~/Applications` (set `INSTALL_DIR` to change that). It then starts the app once, which registers the extension. Keep the app where it is: deleting it removes the extension.
 
-If previews don't appear, check that the extension is turned on under **System Settings → General → Login Items & Extensions → Quick Look**.
+If previews don't appear:
+
+- Check that the extension is turned on under **System Settings → General → Login Items & Extensions → Quick Look**.
+- Relaunch Finder (Option-right-click its Dock icon → Relaunch) and Mail. Running apps cache the extensions they have talked to, which matters after an update that changes the extension's identifier.
+- Run `pluginkit -m -v -i io.github.lhaeger.TNEFPreview.QuickLook`. It should list exactly one copy, the one in `~/Applications`.
 
 The build is ad-hoc signed, which means it runs on the Mac that built it. Copied to another Mac, Gatekeeper will likely block it.
 

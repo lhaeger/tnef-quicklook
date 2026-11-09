@@ -35,7 +35,11 @@ python3 -I scripts/make_fixtures.py TNEFKit/Tests/TNEFKitTests/Fixtures   # dete
 ## Gotchas
 
 - `qlmanage -p` crashes ("key cannot be nil") with app-extension previews. Verify in Finder or Mail instead, or render with `tnef-render` and look at the HTML.
-- After reinstalling, Quick Look may keep the old extension process running. Run `pkill -f TNEFPreviewExtension; qlmanage -r` and close any open preview.
+- After reinstalling, Quick Look may keep the old extension process running. `scripts/install.sh` restarts it; by hand, run `pkill -f TNEFPreviewExtension; killall QuickLookUIService; qlmanage -r`.
+- Finder and Mail cache an extension's XPC service name per process. After the bundle identifier changes they keep connecting to the old name ("extension connection was invalidated" in the log) until the user relaunches them. Avoid changing identifiers.
+- Build output must stay in a `.noindex` folder (`build/DerivedData.noindex`). Otherwise Spotlight finds the built app, LaunchServices registers its extension as a second copy with the same identifier, and Quick Look may pick either one.
+- To read the log, use `/usr/bin/log`: in zsh, `log` is a builtin. From the Claude desktop app the log store is not readable ("Operation not permitted"), so ask the user to run `/usr/bin/log stream --style compact --predicate 'process == "TNEFPreviewExtension"'` in the Terminal panel and read it from there.
+- A sandbox report about `NSSpellChecker` / `mul-xpc (Apple)_OpenStep` about 10 s after the extension starts is AppKit's spell-server preflight timer, not a rendering problem.
 - Install with `ditto` (in place). The user's shell aliases `rm`, `cp` and `mv` to interactive mode, so use `command cp` and friends in ad-hoc commands.
 - Builds are ad-hoc signed (`CODE_SIGN_IDENTITY = -`); there is no team ID.
 
