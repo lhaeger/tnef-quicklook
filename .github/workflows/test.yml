@@ -1,0 +1,22 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parser and renderer tests
+        run: swift test --package-path TNEFKit
+
+      - name: Build app and extension
+        run: |
+          brew install xcodegen
+          xcodegen generate
+          xcodebuild -project TNEFQuickLook.xcodeproj -scheme TNEFPreview -configuration Release \
+            -destination "generic/platform=macOS" -derivedDataPath build/DerivedData -quiet build

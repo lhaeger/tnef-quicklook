@@ -1,6 +1,6 @@
 name: TNEFQuickLook
 options:
-  bundleIdPrefix: local.tnefquicklook
+  bundleIdPrefix: io.github.lhaeger
   deploymentTarget:
     macOS: "14.0"
   createIntermediateGroups: true
@@ -22,6 +22,9 @@ targets:
     type: application
     platform: macOS
     sources: [TNEFPreview]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.lhaeger.TNEFPreview
     dependencies:
       - target: TNEFPreviewExtension
     info:
@@ -38,6 +41,9 @@ targets:
     type: app-extension
     platform: macOS
     sources: [TNEFPreviewExtension]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.lhaeger.TNEFPreview.QuickLook
     dependencies:
       - package: TNEFKit
         product: TNEFKit
