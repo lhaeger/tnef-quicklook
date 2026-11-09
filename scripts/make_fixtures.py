@@ -2,6 +2,7 @@
 """Generate synthetic winmail.dat (TNEF) fixtures for tests.
 
 Usage: python3 -I scripts/make_fixtures.py <output-dir>
+       python3 -I scripts/make_fixtures.py --demo <picture.png> <winmail.dat>
 
 Writes basic.dat, html.dat and rtf-only.dat. The files follow MS-OXTNEF and
 MS-OXRTFCP closely enough that the `tnef` CLI can unpack them, which the tests
@@ -370,7 +371,80 @@ def ole() -> bytes:
     )
 
 
+PR_CLIENT_SUBMIT_TIME = 0x0039
+PR_SENT_REPRESENTING_NAME = 0x0042
+PR_SENDER_EMAIL_ADDRESS = 0x0C1F
+
+
+def prop_systime(pid: int, year, month, day, hour, minute) -> bytes:
+    import datetime
+    moment = datetime.datetime(year, month, day, hour, minute, tzinfo=datetime.timezone.utc)
+    filetime = int((moment.timestamp() + 11_644_473_600) * 10_000_000)
+    return struct.pack("<HHQ", PT_SYSTIME, pid, filetime)
+
+
+def tiny_pdf(text: str) -> bytes:
+    stream = f"BT /F1 24 Tf 72 720 Td ({text}) Tj ET".encode("latin-1")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R "
+        b"/Resources << /Font << /F1 5 0 R >> >> >>",
+        b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for number, body in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % number + body + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)
+    out += b"".join(b"%010d 00000 n \n" % offset for offset in offsets)
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objects) + 1, xref)
+    return bytes(out)
+
+
+def demo(picture: bytes) -> bytes:
+    """The sample mail shown in the README screenshot."""
+    rtf = (
+        b"{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\fswiss Calibri;}}\\fs22\r\n"
+        b"\\pard Hey!\\par\\par\r\n"
+        b"Did you know you can look inside winmail.dat attachments right in Apple Mail? "
+        b"Install {\\b TNEF Preview}, select the attachment and press the space bar:\\par\\par\r\n"
+        b"{\\lang1024\\noproof\\objattph  }\\par\\par\r\n"
+        b"You get the message text, every attachment, and pictures right where the sender put them "
+        b"\\'96 no extra app, no saving, no converting. It never loads anything from the internet, "
+        b"so tracking pixels stay quiet.\\par\\par\r\n"
+        b"It\\'92s free and open source: github.com/lhaeger/tnef-quicklook\\par\\par\r\n"
+        b"Cheers,\\par Alex\\par}\r\n"
+    )
+    picture_object = compound_file([("\x01Ole", b"\x01\x00\x00\x02" + b"\0" * 16), ("CONTENTS", picture)])
+    return tnef(
+        attribute(LVL_MESSAGE, ATT_SUBJECT, b"Did you know? Peek inside winmail.dat\0"),
+        attribute(
+            LVL_MESSAGE,
+            ATT_MSG_PROPS,
+            mapi_props(
+                prop_variable(PT_UNICODE, PR_SENT_REPRESENTING_NAME, unicode_z("Alex Example")),
+                prop_variable(PT_UNICODE, PR_SENDER_EMAIL_ADDRESS, unicode_z("alex@example.com")),
+                prop_systime(PR_CLIENT_SUBMIT_TIME, 2026, 11, 9, 9, 41),
+                prop_variable(PT_BINARY, PR_RTF_COMPRESSED, compress_rtf(rtf)),
+            ),
+        ),
+        ole_attachment("Untitled Attachment", picture_object, position=180),
+        file_attachment("RELEAS~1.PDF", "Release notes.pdf", "application/pdf", tiny_pdf("TNEF Preview release notes")),
+        file_attachment("INSTAL~1.TXT", "Install checklist.txt", "text/plain",
+                        b"1. Run scripts/install.sh\n2. Press the space bar on a winmail.dat\n"),
+    )
+
+
 def main() -> int:
+    if len(sys.argv) == 4 and sys.argv[1] == "--demo":
+        picture = Path(sys.argv[2]).read_bytes()
+        Path(sys.argv[3]).write_bytes(demo(picture))
+        print(f"wrote {sys.argv[3]}")
+        return 0
     if len(sys.argv) != 2:
         print(__doc__, file=sys.stderr)
         return 2

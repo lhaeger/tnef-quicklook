@@ -2,6 +2,12 @@
 
 A Quick Look extension for macOS that shows what's inside `winmail.dat` attachments. Select one in Apple Mail or Finder, press the spacebar, and you see the message text, the attachments and any pictures, without saving or converting anything first.
 
+<p align="center">
+  <img src="docs/screenshot.webp" width="720" alt="Quick Look preview of a winmail.dat: subject, sender and date, a list of three attachments, and the message text with a picture shown inline">
+</p>
+
+The screenshot shows [`docs/winmail.dat`](docs/winmail.dat), a made-up sample mail. Once the extension is installed, select it in Finder and press the spacebar to see the same preview.
+
 `winmail.dat` (MIME type `application/ms-tnef`) is what Outlook and Exchange send when a mail is written in Rich Text format. Apple Mail can't decode it, so you get an opaque attachment. Existing Mac tools can open these files, but none of them hook into Quick Look.
 
 ## Features
@@ -95,6 +101,14 @@ The test files in `TNEFKit/Tests/TNEFKitTests/Fixtures` are synthetic and genera
 
 ```bash
 python3 -I scripts/make_fixtures.py TNEFKit/Tests/TNEFKitTests/Fixtures
+```
+
+The sample mail in `docs/` is generated the same way, from a picture drawn by a Swift script:
+
+```bash
+mkdir -p build/demo
+swift scripts/make_demo_image.swift build/demo/space-to-peek.png
+python3 -I scripts/make_fixtures.py --demo build/demo/space-to-peek.png docs/winmail.dat
 ```
 
 Please don't commit real winmail.dat files; they contain other people's mail.
