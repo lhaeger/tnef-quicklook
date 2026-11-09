@@ -4,6 +4,9 @@ options:
   deploymentTarget:
     macOS: "14.0"
   createIntermediateGroups: true
+packages:
+  TNEFKit:
+    path: TNEFKit
 settings:
   base:
     CODE_SIGN_IDENTITY: "-"
@@ -35,6 +38,11 @@ targets:
     type: app-extension
     platform: macOS
     sources: [TNEFPreviewExtension]
+    dependencies:
+      - package: TNEFKit
+        product: TNEFKit
+      - package: TNEFKit
+        product: TNEFRender
     info:
       path: TNEFPreviewExtension/Info.plist
       properties:
