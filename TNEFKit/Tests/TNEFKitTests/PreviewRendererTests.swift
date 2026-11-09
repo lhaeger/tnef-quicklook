@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import TNEFKit
@@ -96,5 +97,39 @@ private func render(_ name: String) throws -> RenderedPreview {
         message.rtfBody = rtf
         let page = PreviewRenderer().render(message, fileName: "winmail.dat")
         #expect(!page.html.contains("PLACEHOLDER"))
+    }
+}
+
+@Suite struct SizingTests {
+    @Test func rtfFontSizesStayInPoints() throws {
+        let page = try render("rtf-only.dat")
+        let body = try #require(page.html.components(separatedBy: "<section id=\"tnef-body\">").last)
+        #expect(body.range(of: #"font: [0-9.]+pt"#, options: .regularExpression) != nil)
+        #expect(body.range(of: #"[0-9.]+px"#, options: .regularExpression) == nil)
+    }
+
+    private func png(width: Int, height: Int, dpi: Double) throws -> Data {
+        let bitmap = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
+                                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                   colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+        bitmap.size = NSSize(width: Double(width) * 72 / dpi, height: Double(height) * 72 / dpi)
+        return try #require(bitmap.representation(using: .png, properties: [:]))
+    }
+
+    private func shownWidth(dpi: Double) throws -> String? {
+        var message = TNEFMessage()
+        message.attachments = [TNEFAttachment(fileName: "picture.png", data: try png(width: 600, height: 100, dpi: dpi))]
+        let html = PreviewRenderer().render(message, fileName: "winmail.dat").html
+        let match = try #require(html.range(of: #"class="tnef-image" src="cid:[^"]+" width="[0-9]+""#, options: .regularExpression))
+        return html[match].components(separatedBy: "width=\"").last?.replacingOccurrences(of: "\"", with: "")
+    }
+
+    @Test func retinaImagesShowAtPointSize() throws {
+        #expect(try shownWidth(dpi: 144) == "300")
+    }
+
+    @Test func normalImagesShowAtPixelSize() throws {
+        #expect(try shownWidth(dpi: 72) == "600")
+        #expect(try shownWidth(dpi: 96) == "600") // Windows' normal resolution
     }
 }

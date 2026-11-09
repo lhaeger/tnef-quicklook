@@ -81,9 +81,13 @@ enum HTML {
                                         documentAttributes: [.documentType: NSAttributedString.DocumentType.html]),
               let html = String(data: data, encoding: .utf8)
         else { return nil }
-        // AppKit writes absolute colors; drop pure black/white text colors so the body follows dark mode.
-        let styles = matches(#"<style\b[^>]*>.*?</style\s*>"#, in: html).joined()
+        // AppKit writes absolute colors; drop pure black text so the body follows dark mode.
+        var styles = matches(#"<style\b[^>]*>.*?</style\s*>"#, in: html).joined()
             .replacingOccurrences(of: "color: #000000", with: "")
+        // AppKit writes RTF point sizes as px, which makes an 11 pt Outlook body look like 11 px.
+        if let lengths = try? NSRegularExpression(pattern: #"(\d+(?:\.\d+)?)px\b"#) {
+            styles = lengths.stringByReplacingMatches(in: styles, range: NSRange(styles.startIndex..., in: styles), withTemplate: "$1pt")
+        }
         let inner = firstGroup(#"<body\b[^>]*>(.*)</body\s*>"#, in: html) ?? html
         return styles + inner
     }

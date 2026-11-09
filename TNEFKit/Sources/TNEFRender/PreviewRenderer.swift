@@ -211,7 +211,7 @@ private struct Page {
            let png = Self.makeThumbnail(attachment.data, maxPixelSize: renderer.thumbnailPixelSize) {
             let key = "tnef-image-\(index)"
             resources[key] = .init(data: png.data, contentType: .png)
-            result = (key, png.width)
+            result = (key, png.displayWidth)
         }
         thumbnails[index] = .some(result)
         return result
@@ -225,9 +225,17 @@ private struct Page {
         return key
     }
 
-    private static func makeThumbnail(_ data: Data, maxPixelSize: Int) -> (data: Data, width: Int)? {
+    /// PNG version of an image, at most `maxPixelSize` on the long side, and the
+    /// width in CSS pixels to show it at: an image saved at 144 dpi or more (a
+    /// Retina screenshot) is shown at its point size instead of its pixel size.
+    private static func makeThumbnail(_ data: Data, maxPixelSize: Int) -> (data: Data, displayWidth: Int)? {
         let options = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, options) else { return nil }
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, options) as? [CFString: Any] ?? [:]
+        let pixelWidth = properties[kCGImagePropertyPixelWidth] as? Int ?? 0
+        let dpi = properties[kCGImagePropertyDPIWidth] as? Double ?? 72
+        // Windows stores 96 dpi for normal-size images, so only 144 dpi and up counts as high resolution.
+        let scale = dpi >= 144 ? dpi / 72 : 1
         let thumbnailOptions = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
@@ -238,7 +246,8 @@ private struct Page {
         guard let destination = CGImageDestinationCreateWithData(output, UTType.png.identifier as CFString, 1, nil) else { return nil }
         CGImageDestinationAddImage(destination, image, nil)
         guard CGImageDestinationFinalize(destination) else { return nil }
-        return (output as Data, image.width)
+        let displayWidth = pixelWidth > 0 ? Int((Double(pixelWidth) / scale).rounded()) : image.width
+        return (output as Data, displayWidth)
     }
 
     private static func makeIcon(for type: UTType) -> Data? {
