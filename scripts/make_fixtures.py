@@ -234,13 +234,137 @@ def rtf_only() -> bytes:
     )
 
 
+PR_ATTACH_METHOD = 0x3705
+PR_ATTACH_DATA_OBJ = 0x3701
+PT_OBJECT = 0x000D
+ATTACH_OLE = 6
+IID_ISTORAGE = bytes.fromhex("0b000000" "0000" "0000" "c000000000000046")  # {0000000B-0000-0000-C000-000000000046}
+END_OF_CHAIN, FREE, FAT_SECTOR = 0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFD
+
+
+def compound_file(streams: list[tuple[str, bytes]]) -> bytes:
+    """Minimal MS-CFB v3 writer: 512-byte sectors, mini stream for streams < 4096 bytes."""
+    sectors: list[bytes] = []
+    fat: list[int] = []
+
+    def allocate(data: bytes) -> int:
+        if not data:
+            return END_OF_CHAIN
+        data += b"\0" * (-len(data) % 512)
+        start = len(sectors)
+        for index in range(0, len(data), 512):
+            sectors.append(data[index:index + 512])
+            fat.append(len(sectors) if index + 512 < len(data) else END_OF_CHAIN)
+        return start
+
+    mini_stream = bytearray()
+    mini_fat: list[int] = []
+    entries = []
+    for name, data in streams:
+        if len(data) < 4096:
+            start = len(mini_stream) // 64
+            padded = data + b"\0" * (-len(data) % 64)
+            count = max(1, len(padded) // 64)
+            mini_stream += padded or b"\0" * 64
+            mini_fat += [start + i + 1 for i in range(count - 1)] + [END_OF_CHAIN]
+            entries.append((name, 2, start, len(data)))
+        else:
+            entries.append((name, 2, allocate(data), len(data)))
+
+    root_start = allocate(bytes(mini_stream))
+    mini_fat_bytes = b"".join(struct.pack("<I", value) for value in mini_fat)
+    mini_fat_start = allocate(mini_fat_bytes)
+
+    def directory_entry(name, kind, start, size, child=FREE, right=FREE):
+        encoded = (name + "\0").encode("utf-16-le")
+        return (
+            encoded.ljust(64, b"\0")
+            + struct.pack("<HBBIII", len(encoded), kind, 1, FREE, right, child)
+            + b"\0" * 16 + struct.pack("<I", 0) + b"\0" * 16
+            + struct.pack("<IQ", start, size)
+        )
+
+    directory = directory_entry("Root Entry", 5, root_start, len(mini_stream), child=1)
+    for index, (name, kind, start, size) in enumerate(entries, start=1):
+        right = index + 1 if index < len(entries) else FREE
+        directory += directory_entry(name, kind, start, size, right=right)
+    directory_start = allocate(directory)
+
+    fat_sector_count = 1
+    while len(sectors) + fat_sector_count > fat_sector_count * 128:
+        fat_sector_count += 1
+    fat_sectors = list(range(len(sectors), len(sectors) + fat_sector_count))
+    fat += [FAT_SECTOR] * fat_sector_count
+    fat += [FREE] * (fat_sector_count * 128 - len(fat))
+    fat_bytes = b"".join(struct.pack("<I", value) for value in fat)
+    sectors += [fat_bytes[i:i + 512] for i in range(0, len(fat_bytes), 512)]
+
+    header = (
+        bytes.fromhex("d0cf11e0a1b11ae1") + b"\0" * 16
+        + struct.pack("<HHHHH", 0x3E, 3, 0xFFFE, 9, 6) + b"\0" * 6
+        + struct.pack("<IIIIIIIII", 0, fat_sector_count, directory_start, 0, 4096,
+                      mini_fat_start, 1 if mini_fat else 0, END_OF_CHAIN, 0)
+        + b"".join(struct.pack("<I", value) for value in fat_sectors)
+        + struct.pack("<I", FREE) * (109 - len(fat_sectors))
+    )
+    assert len(header) == 512
+    return header + b"".join(sectors)
+
+
+def tiny_bmp(width: int = 40, height: int = 40) -> bytes:
+    row = b"\x30\x80\xd0" * width
+    row += b"\0" * (-len(row) % 4)
+    pixels = row * height
+    return (
+        b"BM" + struct.pack("<IHHI", 54 + len(pixels), 0, 0, 54)
+        + struct.pack("<IiiHHIIiiII", 40, width, height, 1, 24, 0, len(pixels), 2835, 2835, 0, 0)
+        + pixels
+    )
+
+
+def ole10native(label: str, data: bytes) -> bytes:
+    body = (
+        struct.pack("<H", 2) + label.encode("cp1252") + b"\0"
+        + b"C:\\Users\\me\\" + label.encode("cp1252") + b"\0"
+        + struct.pack("<HH", 0, 3)
+        + struct.pack("<I", 12) + b"C:\\tmp\\x.tx\0"
+        + struct.pack("<I", len(data)) + data
+    )
+    return struct.pack("<I", len(body)) + body
+
+
+def ole_attachment(title: str, container: bytes) -> bytes:
+    return (
+        attribute(LVL_ATTACHMENT, ATT_ATTACH_RENDDATA, struct.pack("<HIHHI", 2, 0xFFFFFFFF, 0, 0, 0))
+        + attribute(LVL_ATTACHMENT, ATT_ATTACH_TITLE, title.encode("cp1252") + b"\0")
+        + attribute(
+            LVL_ATTACHMENT,
+            ATT_ATTACHMENT,
+            mapi_props(
+                prop_long(PR_ATTACH_METHOD, ATTACH_OLE),
+                prop_variable(PT_OBJECT, PR_ATTACH_DATA_OBJ, IID_ISTORAGE + container),
+            ),
+        )
+    )
+
+
+def ole() -> bytes:
+    picture = compound_file([("\x01Ole", b"\x01\x00\x00\x02" + b"\0" * 16), ("CONTENTS", tiny_bmp())])
+    package = compound_file([("\x01Ole10Native", ole10native("notes.txt", b"embedded notes\n"))])
+    return tnef(
+        attribute(LVL_MESSAGE, ATT_SUBJECT, b"OLE objects\0"),
+        ole_attachment("Untitled Attachment", picture),
+        ole_attachment("Package", package),
+    )
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print(__doc__, file=sys.stderr)
         return 2
     out = Path(sys.argv[1])
     out.mkdir(parents=True, exist_ok=True)
-    for name, build in (("basic.dat", basic), ("html.dat", html), ("rtf-only.dat", rtf_only)):
+    for name, build in (("basic.dat", basic), ("html.dat", html), ("rtf-only.dat", rtf_only), ("ole.dat", ole)):
         (out / name).write_bytes(build())
         print(f"wrote {out / name}")
     (out / "rtf-body.rtf").write_bytes(RTF_BODY)
